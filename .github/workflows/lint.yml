@@ -1,0 +1,26 @@
+name: lint
+
+on:
+  repository_dispatch:
+    types:
+      - vercel.deployment.ready
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: notify vercel
+        uses: vercel/repository-dispatch/actions/status@v1
+        with:
+          name: "Vercel - sanderum-pubben-hjemmeside: lint"
+      - uses: vercel/repository-dispatch/actions/checkout@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
