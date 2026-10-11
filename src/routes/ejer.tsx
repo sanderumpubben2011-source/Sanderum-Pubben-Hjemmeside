@@ -4,10 +4,12 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
   claimSite,
+  createEditor,
   createEvent,
   createMedia,
   createPrice,
   createStaff,
+  deleteEditor,
   deleteEvent,
   deleteMedia,
   deletePrice,
@@ -50,7 +52,7 @@ function Editor({ userId }: { userId: string }) {
   const router = useRouter();
   const [pack, setPack] = useState<EditorData | null>(null);
   const [draft, setDraft] = useState<Site | null>(null);
-  const [panel, setPanel] = useState<"hus" | "kalender" | "priser" | "galleri" | "holdet">("hus");
+  const [panel, setPanel] = useState<"hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang">("hus");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -114,7 +116,7 @@ function Editor({ userId }: { userId: string }) {
           <p className="mt-8 text-muted">Henter…</p>
         ) : pack.role === "anden" ? (
           <p className="mt-8 rounded-card border border-line bg-paper-2 p-5">
-            Siden har allerede en ejer. Du er logget ind med en anden konto.
+            Siden har allerede en ejer. Din konto kan ikke redigere, før ejeren opretter dig under Adgang.
           </p>
         ) : pack.role === "ledig" ? (
           <div className="mt-8 rounded-card border border-line bg-paper-2 p-6">
@@ -141,13 +143,14 @@ function Editor({ userId }: { userId: string }) {
                   ["priser", "Priser"],
                   ["galleri", "Billeder"],
                   ["holdet", "Holdet"],
+                  ...(pack.role === "ejer" ? ([["adgang", "Adgang"]] as const) : []),
                 ] as const
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => {
-                    setPanel(id);
+                    setPanel(id as "hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang");
                     setMessage("");
                     setError("");
                   }}
@@ -169,11 +172,99 @@ function Editor({ userId }: { userId: string }) {
               {panel === "priser" ? <PriceForm pack={pack} busy={busy} run={run} /> : null}
               {panel === "galleri" ? <GalleryForm pack={pack} busy={busy} run={run} /> : null}
               {panel === "holdet" ? <StaffForm pack={pack} busy={busy} run={run} /> : null}
+              {panel === "adgang" && pack.role === "ejer" ? (
+                <AccessForm pack={pack} busy={busy} run={run} />
+              ) : null}
             </div>
           </>
         )}
       </main>
     </Shell>
+  );
+}
+
+function AccessForm({
+  pack,
+  busy,
+  run,
+}: {
+  pack: EditorData;
+  busy: boolean;
+  run: (task: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  return (
+    <div className="space-y-8">
+      <p className="text-sm leading-6 text-muted">
+        Opret mail og kode til bartender, kasserer eller SoMe. De logger ind på /login og kan rette tekst,
+        events, priser, galleri og holdet. Kun du kan oprette og slette logins.
+      </p>
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const next = { name, email, password };
+          void run(async () => {
+            await createEditor({ data: next });
+            setName("");
+            setEmail("");
+            setPassword("");
+          });
+        }}
+      >
+        <label className="block text-sm">
+          Navn
+          <input className={field} value={name} onChange={(event) => setName(event.target.value)} required />
+        </label>
+        <label className="block text-sm">
+          E-mail
+          <input className={field} type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </label>
+        <label className="block text-sm">
+          Kode
+          <input
+            className={field}
+            type="text"
+            minLength={8}
+            autoComplete="off"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </label>
+        <p className="text-sm text-muted">Mindst 8 tegn. Koden vises her, så du kan give den videre.</p>
+        <button type="submit" disabled={busy} className="min-h-11 rounded-full bg-ink px-5 text-sm font-semibold text-paper">
+          Opret login
+        </button>
+      </form>
+      {pack.editors.length === 0 ? (
+        <p className="text-sm text-muted">Ingen ekstra logins endnu.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {pack.editors.map((person) => (
+            <li key={person.userId} className="flex items-center justify-between gap-4 py-3">
+              <div>
+                <p className="font-semibold">{person.name}</p>
+                <p className="text-sm text-muted">{person.email}</p>
+              </div>
+              <button
+                type="button"
+                className="text-sm text-brass"
+                onClick={() => {
+                  if (window.confirm(`Slet login til ${person.name}?`)) {
+                    void run(() => deleteEditor({ data: { userId: person.userId } }));
+                  }
+                }}
+              >
+                Slet
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

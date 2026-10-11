@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { signupOpen } from "@/lib/pub/api";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log ind · Sanderum Pubben" }] }),
@@ -22,6 +23,13 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [canCreate, setCanCreate] = useState(false);
+
+  useEffect(() => {
+    signupOpen()
+      .then((result) => setCanCreate(result.open))
+      .catch(() => setCanCreate(false));
+  }, []);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -59,7 +67,10 @@ function LoginForm() {
             Tilbage til pubben
           </Link>
           <h1 className="mt-6 font-display text-5xl leading-none">Log ind</h1>
-          <p className="mt-4 text-sm leading-6 text-muted">Kun til dem, der arbejder i huset.</p>
+          <p className="mt-4 text-sm leading-6 text-muted">
+            Kun til dem, der arbejder i huset. Ejeren opretter jeres mail og kode.
+          </p>
+          {canCreate ? (
           <div className="mt-8 grid grid-cols-2 rounded-full bg-paper-2 p-1">
             <button
               type="button"
@@ -76,6 +87,7 @@ function LoginForm() {
               Opret konto
             </button>
           </div>
+          ) : null}
           <form className="mt-6 space-y-3" onSubmit={onSubmit}>
             {mode === "opret" ? (
               <label className="block text-sm">

@@ -1,3 +1,4 @@
+import { hashPassword } from "better-auth/crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
@@ -6,6 +7,7 @@ import { copenhagenNow, isOpenAt } from "./format";
 import type {
   DayHours,
   EditorData,
+  EditorLogin,
   EditorRole,
   Media,
   Price,
@@ -280,12 +282,16 @@ async function loadPub(): Promise<PubData> {
   };
 }
 
-async function requireOwner(userId: string) {
-  const sql = await getSql();
-  const rows = await sql<{ owner_id: string | null }>`select owner_id from pub_site where id = 1`;
-  if (!rows[0]?.owner_id || rows[0].owner_id !== userId) {
-    throw new Error("Kun ejeren kan redigere siden.");
+async function requireEditor(userId: string) {
+  const role = await roleFor(userId);
+  if (role !== "ejer" && role !== "redaktor") {
+    throw new Error("Kun husets folk kan redigere siden.");
   }
+}
+
+async function requireSiteOwner(userId: string) {
+  const role = await roleFor(userId);
+  if (role !== "ejer") throw new Error("Kun ejeren kan oprette logins.");
 }
 
 async function roleFor(userId: string): Promise<EditorRole> {
@@ -293,7 +299,10 @@ async function roleFor(userId: string): Promise<EditorRole> {
   const rows = await sql<{ owner_id: string | null }>`select owner_id from pub_site where id = 1`;
   const owner = rows[0]?.owner_id;
   if (!owner) return "ledig";
-  return owner === userId ? "ejer" : "anden";
+  if (owner === userId) return "ejer";
+  const extra = await sql<{ user_id: string }>`select user_id from editors where user_id = ${userId}`;
+  if (extra.length > 0) return "redaktor";
+  return "anden";
 }
 
 export const getPub = createServerFn({ method: "GET" }).handler(async (): Promise<PubData> => {
@@ -305,7 +314,23 @@ export const getEditor = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<EditorData> => {
     const pub = await loadPub();
     const role = await roleFor(context.userId);
-    return { ...pub, role, durable: dbSource === "neon" };
+    const editors =
+      role === "ejer"
+        ? (
+            await getSql().then((sql) =>
+              sql<{ user_id: string; name: string; email: string }>`
+                select user_id, name, email from editors order by created_at, email
+              `,
+            )
+          ).map(
+            (row): EditorLogin => ({
+              userId: row.user_id,
+              name: row.name,
+              email: row.email,
+            }),
+          )
+        : [];
+    return { ...pub, role, durable: dbSource === "neon", editors };
   });
 
 export const claimSite = createServerFn({ method: "POST" })
@@ -322,7 +347,7 @@ export const updateSite = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(siteSchema, input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     assertImage(data.heroImage, "Forsidebilledet");
     assertImage(data.logoImage, "Logoet");
     assertImage(data.backdrop, "Baggrunden");
@@ -368,7 +393,7 @@ export const createEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(eventSchema, input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     assertImage(data.image, "Eventbilledet");
     const sql = await getSql();
     await sql`
@@ -382,7 +407,7 @@ export const updateEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(eventSchema.extend({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     assertImage(data.image, "Eventbilledet");
     const sql = await getSql();
     await sql`
@@ -402,7 +427,7 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(z.object({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     await sql`delete from events where id = ${data.id}`;
     return { ok: true as const };
@@ -412,7 +437,7 @@ export const createPrice = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(priceSchema, input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     const rows = await sql<{ sort: number }>`select coalesce(max(sort), 0) as sort from prices`;
     const sort = num(rows[0]?.sort) + 10;
@@ -427,7 +452,7 @@ export const updatePrice = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(priceSchema.extend({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     await sql`
       update prices set
@@ -444,7 +469,7 @@ export const deletePrice = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(z.object({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     await sql`delete from prices where id = ${data.id}`;
     return { ok: true as const };
@@ -454,7 +479,7 @@ export const createMedia = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(mediaSchema, input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     if (data.kind === "image") assertImage(data.src, "Billedet");
     else assertVideo(data.src);
     const sql = await getSql();
@@ -473,7 +498,7 @@ export const updateMedia = createServerFn({ method: "POST" })
     parse(mediaSchema.extend({ id: z.number().int().positive() }), input),
   )
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     if (data.kind === "image") assertImage(data.src, "Billedet");
     else assertVideo(data.src);
     const sql = await getSql();
@@ -488,7 +513,7 @@ export const deleteMedia = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(z.object({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     await sql`delete from gallery where id = ${data.id}`;
     return { ok: true as const };
@@ -498,7 +523,7 @@ export const createStaff = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(staffSchema, input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       throw new Error("E-mailen ser ikke rigtig ud.");
     }
@@ -517,7 +542,7 @@ export const updateStaff = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(staffSchema.extend({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       throw new Error("E-mailen ser ikke rigtig ud.");
     }
@@ -539,7 +564,7 @@ export const deleteStaff = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => parse(z.object({ id: z.number().int().positive() }), input))
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     await sql`delete from staff where id = ${data.id}`;
     return { ok: true as const };
@@ -558,7 +583,7 @@ export const moveItem = createServerFn({ method: "POST" })
     ),
   )
   .handler(async ({ data, context }) => {
-    await requireOwner(context.userId);
+    await requireEditor(context.userId);
     const sql = await getSql();
     const rows =
       data.table === "prices"
@@ -582,5 +607,61 @@ export const moveItem = createServerFn({ method: "POST" })
       else if (data.table === "gallery") await sql`update gallery set sort = ${sort} where id = ${id}`;
       else await sql`update staff set sort = ${sort} where id = ${id}`;
     }
+    return { ok: true as const };
+  });
+
+export const signupOpen = createServerFn({ method: "GET" }).handler(async () => {
+  const sql = await getSql();
+  const rows = await sql<{ owner_id: string | null }>`select owner_id from pub_site where id = 1`;
+  return { open: !rows[0]?.owner_id };
+});
+
+export const createEditor = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) =>
+    parse(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        email: z.string().trim().max(120).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Skriv en rigtig e-mail."),
+        password: z.string().min(8).max(128),
+      }),
+      input,
+    ),
+  )
+  .handler(async ({ data, context }) => {
+    await requireSiteOwner(context.userId);
+    const sql = await getSql();
+    const email = data.email.toLowerCase();
+    const existing = await sql<{ id: string }>`select "id" from "user" where lower("email") = ${email}`;
+    if (existing.length > 0) throw new Error("Der findes allerede en konto med den e-mail.");
+    const id = crypto.randomUUID();
+    const hash = await hashPassword(data.password);
+    await sql`
+      insert into "user" ("id", "name", "email", "emailVerified", "createdAt", "updatedAt")
+      values (${id}, ${data.name}, ${email}, true, now(), now())
+    `;
+    await sql`
+      insert into "account" (
+        "id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt"
+      )
+      values (${crypto.randomUUID()}, ${id}, 'credential', ${id}, ${hash}, now(), now())
+    `;
+    await sql`
+      insert into editors (user_id, name, email) values (${id}, ${data.name}, ${email})
+    `;
+    return { ok: true as const };
+  });
+
+export const deleteEditor = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => parse(z.object({ userId: z.string().trim().min(1).max(80) }), input))
+  .handler(async ({ data, context }) => {
+    await requireSiteOwner(context.userId);
+    if (data.userId === context.userId) throw new Error("Du kan ikke slette din egen konto her.");
+    const sql = await getSql();
+    await sql`delete from "session" where "userId" = ${data.userId}`;
+    await sql`delete from "account" where "userId" = ${data.userId}`;
+    await sql`delete from editors where user_id = ${data.userId}`;
+    await sql`delete from "user" where "id" = ${data.userId}`;
     return { ok: true as const };
   });

@@ -79,6 +79,12 @@ export type PubData = {
   openNow: boolean;
 };
 
-export type EditorRole = "ledig" | "ejer" | "anden";
+export type EditorRole = "ledig" | "ejer" | "redaktor" | "anden";
 
-export type EditorData = PubData & { role: EditorRole; durable: boolean };
+export type EditorLogin = {
+  userId: string;
+  name: string;
+  email: string;
+};
+
+export type EditorData = PubData & { role: EditorRole; durable: boolean; editors: EditorLogin[] };
