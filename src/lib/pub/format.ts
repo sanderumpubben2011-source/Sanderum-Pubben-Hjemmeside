@@ -170,7 +170,9 @@ export function videoView(src: string): VideoView {
   if (yt) return { type: "youtube", src: `https://www.youtube-nocookie.com/embed/${yt[1]}` };
   const vimeo = src.match(/vimeo\.com\/(\d+)/);
   if (vimeo) return { type: "vimeo", src: `https://player.vimeo.com/video/${vimeo[1]}` };
-  if (src.startsWith("/media/") || /\.mp4($|\?)/.test(src)) return { type: "file", src };
+  if (src.startsWith("data:video/") || src.startsWith("/media/") || /\.(mp4|webm)($|\?)/i.test(src)) {
+    return { type: "file", src };
+  }
   return { type: "link", src };
 }
 
@@ -190,6 +192,24 @@ export async function fileToImageData(file: File) {
   if (url.length > 1_400_000) url = canvas.toDataURL("image/jpeg", 0.6);
   if (url.length > 1_500_000) throw new Error("Billedet er stadig for stort. Prøv et mindre.");
   return url;
+}
+
+export function fileToVideoData(file: File) {
+  const allowed = file.type === "video/mp4" || file.type === "video/webm" || /\.(mp4|webm)$/i.test(file.name);
+  if (!allowed) throw new Error("Vælg en mp4-film. Den virker på telefonen.");
+  if (file.size > 2_400_000) {
+    throw new Error("Filmen er for stor. Hold den under ca. 2,5 MB, eller sæt et YouTube-link ind.");
+  }
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      if (!result.startsWith("data:video/")) reject(new Error("Kunne ikke læse filmen."));
+      else resolve(result);
+    };
+    reader.onerror = () => reject(new Error("Kunne ikke læse filmen."));
+    reader.readAsDataURL(file);
+  });
 }
 
 export function errText(error: unknown) {

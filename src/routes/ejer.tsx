@@ -22,7 +22,7 @@ import {
   updateSite,
   updateStaff,
 } from "@/lib/pub/api";
-import { errText, fileToImageData, kroner } from "@/lib/pub/format";
+import { errText, fileToImageData, fileToVideoData, kroner } from "@/lib/pub/format";
 import type { DayHours, EditorData, Price, PubEvent, Site, ThemeId } from "@/lib/pub/types";
 import { Shell } from "@/components/shell";
 
@@ -504,6 +504,48 @@ function ImagePicker({
   );
 }
 
+function VideoPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [localError, setLocalError] = useState("");
+  const file = value.startsWith("data:video/") || value.startsWith("/media/") || /\.(mp4|webm)($|\?)/i.test(value);
+  return (
+    <div>
+      <p className="text-sm">Film</p>
+      <p className="mt-1 text-sm text-muted">
+        Vælg en kort mp4 fra telefonen, ligesom filmen i galleriet. En lang film lægges ind som YouTube-link.
+      </p>
+      {value && file ? (
+        <video src={value} controls playsInline className="mt-2 aspect-video w-full rounded-card bg-walnut" />
+      ) : null}
+      <input
+        type="file"
+        accept="video/mp4,video/webm,.mp4,.webm"
+        className="mt-2 block w-full text-sm"
+        onChange={(event) => {
+          const picked = event.target.files?.[0];
+          event.target.value = "";
+          if (!picked) return;
+          setLocalError("");
+          void fileToVideoData(picked)
+            .then(onChange)
+            .catch((err: unknown) => setLocalError(errText(err)));
+        }}
+      />
+      <input
+        className={field}
+        placeholder="eller YouTube-link"
+        value={value.startsWith("data:") ? "" : value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {value ? (
+        <button type="button" className="mt-2 text-sm text-brass" onClick={() => onChange("")}>
+          Fjern
+        </button>
+      ) : null}
+      {localError ? <p className="mt-1 text-sm text-brass">{localError}</p> : null}
+    </div>
+  );
+}
+
 function CalendarForm({
   pack,
   busy,
@@ -771,10 +813,7 @@ function GalleryForm({
         {kind === "image" ? (
           <ImagePicker label="Billede" value={src} onChange={setSrc} />
         ) : (
-          <label className="block text-sm">
-            Videolink
-            <input className={field} placeholder="YouTube, Vimeo eller mp4-link" value={src} onChange={(event) => setSrc(event.target.value)} />
-          </label>
+          <VideoPicker value={src} onChange={setSrc} />
         )}
         <label className="block text-sm">
           Billedtekst
@@ -789,6 +828,8 @@ function GalleryForm({
           <li key={item.id} className="flex gap-3 rounded-card border border-line p-3">
             {item.kind === "image" ? (
               <img src={item.src} alt="" className="h-20 w-28 rounded-lg object-cover" />
+            ) : item.src.startsWith("data:video/") || item.src.startsWith("/media/") || /\.(mp4|webm)($|\?)/i.test(item.src) ? (
+              <video src={item.src} className="h-20 w-28 rounded-lg bg-walnut object-cover" muted playsInline />
             ) : (
               <div className="grid h-20 w-28 place-items-center rounded-lg bg-walnut text-xs text-cream">Video</div>
             )}

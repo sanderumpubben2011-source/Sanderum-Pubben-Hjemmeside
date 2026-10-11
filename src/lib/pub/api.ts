@@ -78,7 +78,7 @@ const staffSchema = z.object({
 
 const mediaSchema = z.object({
   kind: z.enum(["image", "video"]),
-  src: z.string().trim().min(1).max(MAX_IMAGE),
+  src: z.string().trim().min(1).max(3_500_000),
   caption: z.string().trim().max(160),
 });
 
@@ -114,9 +114,13 @@ function assertImage(value: string, label: string) {
 }
 
 function assertVideo(value: string) {
-  const path = value.startsWith("/media/") && value.endsWith(".mp4") && !value.includes("..");
+  const data = /^data:video\/(mp4|webm);base64,/.test(value);
+  const path = value.startsWith("/media/") && !value.includes("..");
   const url = /^https:\/\/\S+$/.test(value) && value.length < 500;
-  if (!path && !url) throw new Error("Video skal være et https-link eller en film på siden.");
+  if (value.length > 3_400_000) {
+    throw new Error("Filmen er for stor. Hold den under ca. 2,5 MB, eller brug et YouTube-link.");
+  }
+  if (!data && !path && !url) throw new Error("Vælg en mp4-film, eller sæt et https-link ind.");
 }
 
 function cleanSocial(value: string, host: string, prefix = "") {
