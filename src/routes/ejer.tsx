@@ -52,7 +52,7 @@ function Editor({ userId }: { userId: string }) {
   const router = useRouter();
   const [pack, setPack] = useState<EditorData | null>(null);
   const [draft, setDraft] = useState<Site | null>(null);
-  const [panel, setPanel] = useState<"hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang">("hus");
+  const [panel, setPanel] = useState<"hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang" | "log">("hus");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -143,6 +143,7 @@ function Editor({ userId }: { userId: string }) {
                   ["priser", "Priser"],
                   ["galleri", "Billeder"],
                   ["holdet", "Holdet"],
+                  ["log", "Log"],
                   ...(pack.role === "ejer" ? ([["adgang", "Adgang"]] as const) : []),
                 ] as const
               ).map(([id, label]) => (
@@ -150,7 +151,7 @@ function Editor({ userId }: { userId: string }) {
                   key={id}
                   type="button"
                   onClick={() => {
-                    setPanel(id as "hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang");
+                    setPanel(id as "hus" | "kalender" | "priser" | "galleri" | "holdet" | "adgang" | "log");
                     setMessage("");
                     setError("");
                   }}
@@ -175,11 +176,39 @@ function Editor({ userId }: { userId: string }) {
               {panel === "adgang" && pack.role === "ejer" ? (
                 <AccessForm pack={pack} busy={busy} run={run} />
               ) : null}
+              {panel === "log" ? <LogList pack={pack} /> : null}
             </div>
           </>
         )}
       </main>
     </Shell>
+  );
+}
+
+function LogList({ pack }: { pack: EditorData }) {
+  if (!pack.log.length) {
+    return <p className="text-sm text-muted">Der er ikke rettet noget endnu. Næste ændring kommer med her.</p>;
+  }
+  return (
+    <ol className="space-y-3">
+      {pack.log.map((entry) => (
+        <li key={entry.id} className="rounded-card border border-line bg-paper-2 px-4 py-3">
+          <p className="text-xs font-semibold tracking-widest text-brass uppercase">{entry.area}</p>
+          <p className="mt-1 text-sm leading-6">{entry.detail}</p>
+          <p className="mt-1 text-xs text-muted">
+            {entry.userName}
+            {" · "}
+            {new Date(entry.createdAt).toLocaleString("da-DK", {
+              timeZone: "Europe/Copenhagen",
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }
 

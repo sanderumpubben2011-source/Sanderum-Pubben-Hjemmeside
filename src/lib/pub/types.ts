@@ -87,4 +87,17 @@ export type EditorLogin = {
   email: string;
 };
 
-export type EditorData = PubData & { role: EditorRole; durable: boolean; editors: EditorLogin[] };
+export type AuditEntry = {
+  id: number;
+  userName: string;
+  area: string;
+  detail: string;
+  createdAt: string;
+};
+
+export type EditorData = PubData & {
+  role: EditorRole;
+  durable: boolean;
+  editors: EditorLogin[];
+  log: AuditEntry[];
+};

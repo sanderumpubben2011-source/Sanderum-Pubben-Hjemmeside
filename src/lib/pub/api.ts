@@ -7,6 +7,7 @@ import { copenhagenNow, isOpenAt } from "./format";
 import type {
   DayHours,
   EditorData,
+  AuditEntry,
   EditorLogin,
   EditorRole,
   Media,
@@ -305,6 +306,43 @@ async function roleFor(userId: string): Promise<EditorRole> {
   return "anden";
 }
 
+function clip(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (!clean) return "tom";
+  return clean.length > 70 ? `${clean.slice(0, 70)}…` : clean;
+}
+
+function dayLabel(value: unknown) {
+  const text = value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? "");
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (!match) return text;
+  return `${Number(match[3])}/${Number(match[2])}`;
+}
+
+function clock(value: unknown) {
+  return String(value ?? "").slice(0, 5);
+}
+
+function change(label: string, before: string, after: string, long = false) {
+  if (before === after) return "";
+  if (long || before.length > 70 || after.length > 70) return `${label} er ændret`;
+  return `${label}: ${clip(before)} → ${clip(after)}`;
+}
+
+async function writeLog(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  userId: string,
+  area: string,
+  detail: string,
+) {
+  const rows = await sql<{ name: string }>`select "name" from "user" where "id" = ${userId}`;
+  const userName = rows[0]?.name?.trim() || "Ukendt";
+  await sql`
+    insert into audit_log (user_id, user_name, area, detail)
+    values (${userId}, ${userName}, ${area}, ${detail})
+  `;
+}
+
 export const getPub = createServerFn({ method: "GET" }).handler(async (): Promise<PubData> => {
   return loadPub();
 });
@@ -330,7 +368,28 @@ export const getEditor = createServerFn({ method: "GET" })
             }),
           )
         : [];
-    return { ...pub, role, durable: dbSource === "neon", editors };
+    const log =
+      role === "ejer" || role === "redaktor"
+        ? (
+            await getSql().then((sql) =>
+              sql<{ id: number; user_name: string; area: string; detail: string; created_at: string | Date }>`
+                select id, user_name, area, detail, created_at
+                from audit_log
+                order by id desc
+                limit 100
+              `,
+            )
+          ).map(
+            (row): AuditEntry => ({
+              id: num(row.id),
+              userName: row.user_name,
+              area: row.area,
+              detail: row.detail,
+              createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+            }),
+          )
+        : [];
+    return { ...pub, role, durable: dbSource === "neon", editors, log };
   });
 
 export const claimSite = createServerFn({ method: "POST" })
@@ -360,6 +419,35 @@ export const updateSite = createServerFn({ method: "POST" })
     const tiktok = cleanSocial(data.tiktok, "www.tiktok.com", "@");
     const snapchat = cleanSocial(data.snapchat, "www.snapchat.com", "add/");
     const sql = await getSql();
+    const before = await sql<{
+      name: string;
+      tagline: string;
+      about: string;
+      phone: string;
+      email: string;
+      address: string;
+      city: string;
+      facebook: string;
+      instagram: string;
+      youtube: string;
+      tiktok: string;
+      snapchat: string;
+      hero_image: string;
+      logo_image: string;
+      backdrop: string;
+      theme: string;
+      hours_json: string;
+      hours_note: string;
+      prices_note: string;
+      prices_live: boolean;
+      calendar_live: boolean;
+    }>`
+      select name, tagline, about, phone, email, address, city, facebook, instagram, youtube, tiktok,
+        snapchat, hero_image, logo_image, backdrop, theme, hours_json, hours_note, prices_note,
+        prices_live, calendar_live
+      from pub_site where id = 1
+    `;
+    const old = before[0];
     await sql`
       update pub_site set
         name = ${data.name},
@@ -386,6 +474,42 @@ export const updateSite = createServerFn({ method: "POST" })
         updated_at = now()
       where id = 1
     `;
+    if (old) {
+      const sameHours = (() => {
+        try {
+          return JSON.stringify(JSON.parse(old.hours_json)) === JSON.stringify(data.hours);
+        } catch {
+          return false;
+        }
+      })();
+      const bits = [
+        change("Navn", old.name, data.name),
+        change("Undertitel", old.tagline, data.tagline),
+        change("Tekst", old.about, data.about, true),
+        change("Telefon", old.phone, data.phone),
+        change("E-mail", old.email, data.email),
+        change("Adresse", `${old.address}, ${old.city}`, `${data.address}, ${data.city}`),
+        change("Facebook", old.facebook, facebook),
+        change("Instagram", old.instagram, instagram),
+        change("YouTube", old.youtube, youtube),
+        change("TikTok", old.tiktok, tiktok),
+        change("Snapchat", old.snapchat, snapchat),
+        old.hero_image === (data.heroImage || "/media/hero.jpg") ? "" : "Forsidebilledet er skiftet",
+        old.logo_image === data.logoImage ? "" : "Logoet er skiftet",
+        old.backdrop === data.backdrop ? "" : "Baggrunden er skiftet",
+        change("Udtryk", old.theme, data.theme),
+        sameHours ? "" : "Åbningstiderne er ændret",
+        change("Note til åbningstider", old.hours_note, data.hoursNote, true),
+        change("Note til priser", old.prices_note, data.pricesNote, true),
+        Boolean(old.prices_live) === data.pricesLive ? "" : data.pricesLive ? "Priserne er markeret som de rigtige" : "Priserne er markeret som eksempler",
+        Boolean(old.calendar_live) === data.calendarLive
+          ? ""
+          : data.calendarLive
+            ? "Kalenderen er markeret som den rigtige"
+            : "Kalenderen er markeret som eksempler",
+      ].filter(Boolean);
+      if (bits.length) await writeLog(sql, context.userId, "Huset", bits.join(". ") + ".");
+    }
     return { ok: true as const };
   });
 
@@ -400,6 +524,12 @@ export const createEvent = createServerFn({ method: "POST" })
       insert into events (title, description, event_date, start_time, end_time, image)
       values (${data.title}, ${data.description}, ${data.eventDate}, ${data.startTime}, ${data.endTime}, ${data.image})
     `;
+    await writeLog(
+      sql,
+      context.userId,
+      "Event",
+      `Oprettede ${data.title} den ${dayLabel(data.eventDate)}.`,
+    );
     return { ok: true as const };
   });
 
@@ -410,6 +540,15 @@ export const updateEvent = createServerFn({ method: "POST" })
     await requireEditor(context.userId);
     assertImage(data.image, "Eventbilledet");
     const sql = await getSql();
+    const before = await sql<{
+      title: string;
+      description: string;
+      event_date: string | Date;
+      start_time: string;
+      end_time: string;
+      image: string;
+    }>`select title, description, event_date, start_time, end_time, image from events where id = ${data.id}`;
+    const old = before[0];
     await sql`
       update events set
         title = ${data.title},
@@ -420,6 +559,17 @@ export const updateEvent = createServerFn({ method: "POST" })
         image = ${data.image}
       where id = ${data.id}
     `;
+    if (old) {
+      const bits = [
+        change("Titel", old.title, data.title),
+        change("Dato", dayLabel(old.event_date), dayLabel(data.eventDate)),
+        change("Start", clock(old.start_time), data.startTime),
+        change("Slut", clock(old.end_time), data.endTime),
+        change("Tekst", old.description, data.description, true),
+        old.image === data.image ? "" : "Billedet er skiftet",
+      ].filter(Boolean);
+      if (bits.length) await writeLog(sql, context.userId, "Event", `Ændrede ${old.title}. ${bits.join(". ")}.`);
+    }
     return { ok: true as const };
   });
 
@@ -429,7 +579,9 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireEditor(context.userId);
     const sql = await getSql();
+    const before = await sql<{ title: string }>`select title from events where id = ${data.id}`;
     await sql`delete from events where id = ${data.id}`;
+    if (before[0]) await writeLog(sql, context.userId, "Event", `Slettede ${before[0].title}.`);
     return { ok: true as const };
   });
 
@@ -445,6 +597,7 @@ export const createPrice = createServerFn({ method: "POST" })
       insert into prices (category, name, price_kr, note, sort)
       values (${data.category}, ${data.name}, ${data.priceKr}, ${data.note}, ${sort})
     `;
+    await writeLog(sql, context.userId, "Pris", `Oprettede ${data.name} til ${data.priceKr} kr.`);
     return { ok: true as const };
   });
 
@@ -454,6 +607,10 @@ export const updatePrice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireEditor(context.userId);
     const sql = await getSql();
+    const before = await sql<{ category: string; name: string; price_kr: number; note: string }>`
+      select category, name, price_kr, note from prices where id = ${data.id}
+    `;
+    const old = before[0];
     await sql`
       update prices set
         category = ${data.category},
@@ -462,6 +619,15 @@ export const updatePrice = createServerFn({ method: "POST" })
         note = ${data.note}
       where id = ${data.id}
     `;
+    if (old) {
+      const bits = [
+        change("Navn", old.name, data.name),
+        change("Kategori", old.category, data.category),
+        change("Pris", `${num(old.price_kr)} kr`, `${data.priceKr} kr`),
+        change("Note", old.note, data.note, true),
+      ].filter(Boolean);
+      if (bits.length) await writeLog(sql, context.userId, "Pris", `Ændrede ${old.name}. ${bits.join(". ")}.`);
+    }
     return { ok: true as const };
   });
 
@@ -471,7 +637,9 @@ export const deletePrice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireEditor(context.userId);
     const sql = await getSql();
+    const before = await sql<{ name: string }>`select name from prices where id = ${data.id}`;
     await sql`delete from prices where id = ${data.id}`;
+    if (before[0]) await writeLog(sql, context.userId, "Pris", `Slettede ${before[0].name}.`);
     return { ok: true as const };
   });
 
@@ -489,6 +657,8 @@ export const createMedia = createServerFn({ method: "POST" })
       insert into gallery (kind, src, caption, sort)
       values (${data.kind}, ${data.src}, ${data.caption}, ${sort})
     `;
+    const kind = data.kind === "video" ? "videoen" : "billedet";
+    await writeLog(sql, context.userId, "Galleri", `Tilføjede ${kind}${data.caption ? `: ${clip(data.caption)}` : ""}.`);
     return { ok: true as const };
   });
 
@@ -502,10 +672,24 @@ export const updateMedia = createServerFn({ method: "POST" })
     if (data.kind === "image") assertImage(data.src, "Billedet");
     else assertVideo(data.src);
     const sql = await getSql();
+    const before = await sql<{ kind: string; caption: string; src: string }>`
+      select kind, caption, src from gallery where id = ${data.id}
+    `;
+    const old = before[0];
     await sql`
       update gallery set kind = ${data.kind}, src = ${data.src}, caption = ${data.caption}
       where id = ${data.id}
     `;
+    if (old) {
+      const bits = [
+        change("Tekst", old.caption, data.caption),
+        old.src === data.src ? "" : "Filen er skiftet",
+      ].filter(Boolean);
+      if (bits.length) {
+        const kind = old.kind === "video" ? "videoen" : "billedet";
+        await writeLog(sql, context.userId, "Galleri", `Ændrede ${kind}${old.caption ? ` ${clip(old.caption)}` : ""}. ${bits.join(". ")}.`);
+      }
+    }
     return { ok: true as const };
   });
 
@@ -515,7 +699,17 @@ export const deleteMedia = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireEditor(context.userId);
     const sql = await getSql();
+    const before = await sql<{ kind: string; caption: string }>`select kind, caption from gallery where id = ${data.id}`;
     await sql`delete from gallery where id = ${data.id}`;
+    if (before[0]) {
+      const kind = before[0].kind === "video" ? "videoen" : "billedet";
+      await writeLog(
+        sql,
+        context.userId,
+        "Galleri",
+        `Slettede ${kind}${before[0].caption ? `: ${clip(before[0].caption)}` : ""}.`,
+      );
+    }
     return { ok: true as const };
   });
 
@@ -535,6 +729,7 @@ export const createStaff = createServerFn({ method: "POST" })
       insert into staff (name, role, email, phone, image, sort)
       values (${data.name}, ${data.role}, ${data.email}, ${data.phone}, ${data.image}, ${sort})
     `;
+    await writeLog(sql, context.userId, "Holdet", `Tilføjede ${data.name} som ${data.role}.`);
     return { ok: true as const };
   });
 
@@ -548,6 +743,10 @@ export const updateStaff = createServerFn({ method: "POST" })
     }
     assertImage(data.image, "Billedet");
     const sql = await getSql();
+    const before = await sql<{ name: string; role: string; email: string; phone: string; image: string }>`
+      select name, role, email, phone, image from staff where id = ${data.id}
+    `;
+    const old = before[0];
     await sql`
       update staff set
         name = ${data.name},
@@ -557,6 +756,16 @@ export const updateStaff = createServerFn({ method: "POST" })
         image = ${data.image}
       where id = ${data.id}
     `;
+    if (old) {
+      const bits = [
+        change("Navn", old.name, data.name),
+        change("Rolle", old.role, data.role),
+        change("E-mail", old.email, data.email),
+        change("Telefon", old.phone, data.phone),
+        old.image === data.image ? "" : "Billedet er skiftet",
+      ].filter(Boolean);
+      if (bits.length) await writeLog(sql, context.userId, "Holdet", `Ændrede ${old.name}. ${bits.join(". ")}.`);
+    }
     return { ok: true as const };
   });
 
@@ -566,7 +775,9 @@ export const deleteStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireEditor(context.userId);
     const sql = await getSql();
+    const before = await sql<{ name: string }>`select name from staff where id = ${data.id}`;
     await sql`delete from staff where id = ${data.id}`;
+    if (before[0]) await writeLog(sql, context.userId, "Holdet", `Slettede ${before[0].name}.`);
     return { ok: true as const };
   });
 
@@ -649,6 +860,7 @@ export const createEditor = createServerFn({ method: "POST" })
     await sql`
       insert into editors (user_id, name, email) values (${id}, ${data.name}, ${email})
     `;
+    await writeLog(sql, context.userId, "Adgang", `Oprettede login til ${data.name} (${email}).`);
     return { ok: true as const };
   });
 
@@ -659,9 +871,11 @@ export const deleteEditor = createServerFn({ method: "POST" })
     await requireSiteOwner(context.userId);
     if (data.userId === context.userId) throw new Error("Du kan ikke slette din egen konto her.");
     const sql = await getSql();
+    const before = await sql<{ name: string; email: string }>`select name, email from editors where user_id = ${data.userId}`;
     await sql`delete from "session" where "userId" = ${data.userId}`;
     await sql`delete from "account" where "userId" = ${data.userId}`;
     await sql`delete from editors where user_id = ${data.userId}`;
     await sql`delete from "user" where "id" = ${data.userId}`;
+    if (before[0]) await writeLog(sql, context.userId, "Adgang", `Slettede login til ${before[0].name} (${before[0].email}).`);
     return { ok: true as const };
   });
