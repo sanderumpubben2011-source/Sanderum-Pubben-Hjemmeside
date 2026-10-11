@@ -101,6 +101,13 @@ function Editor({ userId }: { userId: string }) {
         <p className="mt-4 text-sm leading-6 text-muted">
           Her lægger du events ind, retter priser og skifter billeder, video, logo og baggrund.
         </p>
+        {pack && !pack.durable ? (
+          <p className="mt-4 rounded-card border border-brass-solid bg-paper-2 p-4 text-sm leading-6">
+            Login huskes i browseren, men rettelser bliver ikke gemt. Databasen er ikke koblet til siden,
+            så den starter forfra ved næste besøg. Sæt <span className="font-semibold">DATABASE_URL</span> fra
+            Neon i Vercel, og deploy igen.
+          </p>
+        ) : null}
         {error ? <p className="mt-4 text-sm text-brass">{error}</p> : null}
         {message ? <p className="mt-4 text-sm">{message}</p> : null}
         {!pack || !draft ? (

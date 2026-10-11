@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { getSql } from "@/lib/db";
+import { dbSource, getSql } from "@/lib/db";
 import { copenhagenNow, isOpenAt } from "./format";
 import type {
   DayHours,
@@ -305,7 +305,7 @@ export const getEditor = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<EditorData> => {
     const pub = await loadPub();
     const role = await roleFor(context.userId);
-    return { ...pub, role };
+    return { ...pub, role, durable: dbSource === "neon" };
   });
 
 export const claimSite = createServerFn({ method: "POST" })

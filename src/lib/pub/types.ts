@@ -81,4 +81,4 @@ export type PubData = {
 
 export type EditorRole = "ledig" | "ejer" | "anden";
 
-export type EditorData = PubData & { role: EditorRole };
+export type EditorData = PubData & { role: EditorRole; durable: boolean };

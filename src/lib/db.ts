@@ -87,13 +87,14 @@ function toSql(run: Run): Sql {
 
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-    // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
     const { Pool, types } = await import("pg");
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    await migrateNeon(databaseUrl as string);
+    // max: 1 — Vercel runs one request at a time per instance, and Neon's
+    // pooler rejects a pile of idle clients.
+    const pool = new Pool({ connectionString: databaseUrl, max: 1 });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
@@ -103,6 +104,43 @@ function createNeonSql(): Promise<Sql> {
     throw err;
   });
   return globalRef.__pgSqlPromise__;
+}
+
+/** Apply migrations/*.sql once per process so a deploy that never saw DATABASE_URL still gets the pub tables. */
+async function migrateNeon(connectionString: string) {
+  const { Client } = await import("pg");
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(
+      "create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())",
+    );
+    const migrations = import.meta.glob("/migrations/*.sql", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    const done = (await client.query<{ name: string }>("select name from _migrations")).rows.map(
+      (row) => row.name,
+    );
+    for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) {
+      try {
+        await client.query("BEGIN");
+        await client.query(migrations[path]);
+        await client.query("insert into _migrations (name) values ($1)", [name]);
+        await client.query("COMMIT");
+      } catch (err) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // keep the original error
+        }
+        throw err;
+      }
+    }
+  } finally {
+    await client.end();
+  }
 }
 
 async function createPgliteSql(): Promise<Sql> {
