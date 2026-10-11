@@ -150,6 +150,7 @@ function LoginForm() {
 
 function danishAuth(message: string) {
   const text = message.toLowerCase();
+  if (text.includes("origin")) return "Login blev afvist af siden. Vent et minut og prøv igen.";
   if (text.includes("already") || text.includes("exist")) return "Der findes allerede en konto med den e-mail.";
   if (text.includes("password") || text.includes("invalid") || text.includes("credential")) {
     return "Tjek e-mail og adgangskode. Den skal være mindst 8 tegn.";
