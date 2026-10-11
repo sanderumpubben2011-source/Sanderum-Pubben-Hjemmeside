@@ -102,7 +102,12 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="relative min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-brass-solid/40 bg-walnut text-cream">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-5">
-          <Link to="/" className="flex min-w-0 items-center">
+          <Link
+            to="/"
+            aria-label="Til forsiden"
+            className="flex min-w-0 items-center"
+            onClick={() => window.scrollTo({ top: 0 })}
+          >
             <img src={logo} alt={site.name} className="h-12 w-auto max-w-[42vw] object-contain object-left sm:h-14" />
           </Link>
           <nav className="ml-auto hidden items-center gap-1 lg:flex">
@@ -154,7 +159,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <footer className="mt-20 bg-walnut text-cream">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-3">
           <div>
-            <img src={logo} alt="" className="h-16 w-auto sm:h-20" />
+            <Link to="/" aria-label="Til forsiden" className="inline-block" onClick={() => window.scrollTo({ top: 0 })}>
+              <img src={logo} alt={site.name} className="h-16 w-auto sm:h-20" />
+            </Link>
             <p className="mt-4 max-w-xs text-sm text-cream/75">{site.tagline}</p>
           </div>
           <div className="text-sm leading-7">

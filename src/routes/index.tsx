@@ -17,11 +17,13 @@ function Home() {
       <main>
         <section className="bg-walnut">
           <h1 className="sr-only">{site.name}</h1>
-          <img
-            src="/media/velkommen.jpg"
-            alt="Velkommen til Sanderum Pubben. Gode øl, godt selskab og god stemning. Vi ses."
-            className="w-full"
-          />
+          <Link to="/" aria-label="Til forsiden" className="block" onClick={() => window.scrollTo({ top: 0 })}>
+            <img
+              src="/media/velkommen.jpg"
+              alt="Velkommen til Sanderum Pubben. Gode øl, godt selskab og god stemning. Vi ses."
+              className="w-full"
+            />
+          </Link>
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-4 px-5 py-6 text-cream">
             <p className="text-sm">
               <span className="mr-3 inline-flex min-h-8 items-center rounded-full bg-cream px-3 text-ink">
