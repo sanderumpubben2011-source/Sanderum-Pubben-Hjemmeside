@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
-import { GROK_PROVIDERS, authClient, signIn } from "@/lib/auth/client";
+import { authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { signupOpen } from "@/lib/pub/api";
 
@@ -132,27 +132,6 @@ function LoginForm() {
               {busy ? "Vent…" : mode === "opret" ? "Opret og fortsæt" : "Log ind"}
             </button>
           </form>
-          <div className="my-6 flex items-center gap-3 text-xs tracking-widest text-muted uppercase">
-            <span className="h-px flex-1 bg-line" />
-            eller
-            <span className="h-px flex-1 bg-line" />
-          </div>
-          <div className="space-y-2">
-            {GROK_PROVIDERS.map((provider) => (
-              <button
-                key={provider.providerId}
-                type="button"
-                className="min-h-11 w-full rounded-full border border-line text-sm"
-                onClick={() => {
-                  void signIn(provider.providerId, { callbackURL: "/ejer" }).catch((err: unknown) => {
-                    setError(err instanceof Error ? err.message : "Login fejlede.");
-                  });
-                }}
-              >
-                Fortsæt med {provider.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
       <img src="/media/facade.jpg" alt="" className="hidden h-full w-full object-cover lg:block" />
