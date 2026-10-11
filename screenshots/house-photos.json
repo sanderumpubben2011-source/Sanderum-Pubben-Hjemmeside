@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Sanderum Pubben · Værtshus i Odense SV",
+      "hasCanvas": false,
+      "bodyTextLen": 2060,
+      "bodyTextHash": "6101f01cde8840d0af9c4e61c463f619c0d2ced6df923480bd4b08ef437fdc13",
+      "bodyTextPrefix": "Sanderum Pubben Hjem Kalender Priser Galleri Kontakt Sanderum Pu",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/house-photos.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Sanderum Pubben · Værtshus i Odense SV",
+      "hasCanvas": false,
+      "bodyTextLen": 2023,
+      "bodyTextHash": "80fe799dbfcf412276dfdeb68d7bcb2de9a03b6018179b07b97807c7b715eb55",
+      "bodyTextPrefix": "Sanderum Pubben Sanderum Pubben Åben nuI dag 11:00–19:00 Se kale",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/house-photos-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/house-photos.json"
+}

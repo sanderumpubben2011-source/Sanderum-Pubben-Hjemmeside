@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Sanderum Pubben · Værtshus i Odense SV",
+      "hasCanvas": false,
+      "bodyTextLen": 2110,
+      "bodyTextHash": "ee60ff1d9dc86d959909c433de81b06b99b40e17147c9eca80bf2011424ac6ca",
+      "bodyTextPrefix": "Sanderum Pubben Hjem Kalender Priser Galleri Kontakt VÆRTSHUS · ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Sanderum Pubben · Værtshus i Odense SV",
+      "hasCanvas": false,
+      "bodyTextLen": 2073,
+      "bodyTextHash": "7fa84eb7f88c0e2cc9dcbad85b4c21f667751576aa5a10e55497e0c5735beb9f",
+      "bodyTextPrefix": "Sanderum Pubben VÆRTSHUS · ODENSE SV · SIDEN 2011 Sanderum Pubbe",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}

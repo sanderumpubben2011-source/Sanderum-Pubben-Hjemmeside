@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Sanderum Pubben">
+  <rect width="32" height="32" rx="7" fill="#261910"/>
+  <path fill="#c17a3a" d="M10 7h12l-1.7 10.6c-.45 2.8-2.35 4.6-4.3 4.6s-3.85-1.8-4.3-4.6L10 7z"/>
+  <rect x="14.6" y="21.8" width="2.8" height="3.2" fill="#c17a3a"/>
+  <rect x="11.2" y="24.6" width="9.6" height="2" rx="1" fill="#f3eadc"/>
+  <ellipse cx="16" cy="8.1" rx="4.6" ry="1.7" fill="#f3eadc"/>
+</svg>
