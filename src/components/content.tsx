@@ -113,10 +113,10 @@ export function HoursTable({
           return (
             <li
               key={row.day}
-              className={`flex items-center justify-between gap-4 py-3 ${today ? "font-semibold" : ""}`}
+              className={`flex items-center justify-between gap-4 rounded-xl px-3 py-3 ${today ? "bg-walnut font-semibold text-cream" : ""}`}
             >
               <span>{row.day}</span>
-              <span className="tabular-nums text-muted">
+              <span className={`tabular-nums ${today ? "text-brass-solid" : "text-muted"}`}>
                 {row.closed ? "Lukket" : `${row.open}–${row.close}`}
                 {today ? " · i dag" : ""}
               </span>

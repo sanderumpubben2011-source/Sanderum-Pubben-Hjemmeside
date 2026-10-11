@@ -69,20 +69,32 @@ function Home() {
           </div>
         </section>
 
-        <section className="mx-auto grid max-w-6xl gap-12 px-5 py-20 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <Kicker>Huset</Kicker>
-            <h2 className="mt-3 font-display text-4xl">Stamstedet på Sanderumvej</h2>
-            <div className="mt-6 space-y-4 text-lg leading-8">
-              {paragraphs(site.about).map((part) => (
-                <p key={part.slice(0, 24)}>{part}</p>
-              ))}
+        <section className="bg-paper-2">
+          <div className="mx-auto grid max-w-6xl items-stretch gap-5 px-5 py-16 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="flex flex-col justify-between rounded-card bg-walnut px-7 py-9 text-cream sm:px-10 sm:py-11">
+              <div>
+                <p className="text-xs font-semibold tracking-widest text-brass-solid uppercase">Huset</p>
+                <h2 className="mt-3 font-display text-4xl leading-none sm:text-5xl">Stamstedet på Sanderumvej</h2>
+                <div className="mt-8 space-y-4 text-lg leading-8 text-cream/85">
+                  {paragraphs(site.about).map((part, index) => (
+                    <p key={part.slice(0, 24)} className={index === 0 ? "font-display text-3xl leading-tight text-cream italic" : ""}>
+                      {part}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-10 text-sm text-cream/70">
+                {site.address}, {site.city}
+                <a className="mt-1 block text-brass-solid" href={phoneHref(site.phone)}>
+                  {site.phone}
+                </a>
+              </p>
             </div>
-          </div>
-          <div>
-            <Kicker>Åbent</Kicker>
-            <div className="mt-3">
-              <HoursTable hours={site.hours} weekday={weekday} note={site.hoursNote} />
+            <div className="rounded-card border border-line bg-paper px-6 py-8 sm:px-8">
+              <Kicker>Åbent</Kicker>
+              <div className="mt-4">
+                <HoursTable hours={site.hours} weekday={weekday} note={site.hoursNote} />
+              </div>
             </div>
           </div>
         </section>
