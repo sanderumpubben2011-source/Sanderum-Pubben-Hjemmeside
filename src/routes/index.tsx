@@ -87,23 +87,6 @@ function Home() {
           </div>
         </section>
 
-        <section className="border-y border-line bg-paper-2">
-          <div className="mx-auto grid max-w-6xl gap-px sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              ["01", "Billard", "Et bord til en rolig omgang, eller til turneringen når den er sat."],
-              ["02", "Dart", "Tavlen hænger klar. 501, og plads til nye spillere."],
-              ["03", "Rafle", "Terningerne kommer frem, når selskabet er til det."],
-              ["04", "Terrasse", "Borde ude foran, når vejret på Sanderumvej er med."],
-            ].map(([n, title, text]) => (
-              <article key={n} className="px-5 py-10">
-                <p className="font-display text-3xl text-brass">{n}</p>
-                <h3 className="mt-3 font-display text-2xl">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted">{text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
         <section className="mx-auto max-w-6xl px-5 py-20">
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
