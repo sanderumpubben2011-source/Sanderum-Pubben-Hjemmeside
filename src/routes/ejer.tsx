@@ -268,7 +268,7 @@ function HouseForm({
         value={draft.heroImage}
         onChange={(heroImage) => patch({ heroImage })}
       />
-      <ImagePicker label="Logo" value={draft.logoImage} onChange={(logoImage) => patch({ logoImage })} />
+      <ImagePicker label="Logo" contain value={draft.logoImage} onChange={(logoImage) => patch({ logoImage })} />
       <ImagePicker
         label="Baggrundsbillede"
         value={draft.backdrop}
@@ -328,16 +328,24 @@ function ImagePicker({
   label,
   value,
   onChange,
+  contain = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  contain?: boolean;
 }) {
   const [localError, setLocalError] = useState("");
   return (
     <div>
       <p className="text-sm">{label}</p>
-      {value ? <img src={value} alt="" className="mt-2 h-36 w-full rounded-card object-cover" /> : null}
+      {value ? (
+        <img
+          src={value}
+          alt=""
+          className={`mt-2 h-36 w-full rounded-card bg-walnut ${contain ? "object-contain" : "object-cover"}`}
+        />
+      ) : null}
       <input
         type="file"
         accept="image/*"
@@ -350,6 +358,9 @@ function ImagePicker({
             .catch((err: unknown) => setLocalError(errText(err)));
         }}
       />
+      {value ? (
+        <p className="mt-1 text-sm text-muted">Billedet er valgt. Tryk Gem huset, så det bliver hængende.</p>
+      ) : null}
       <input
         className={field}
         placeholder="eller https-link"
