@@ -34,6 +34,51 @@ function OwnerSlot() {
   );
 }
 
+type InstallPrompt = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+function InstallApp() {
+  const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
+  const [ios, setIos] = useState(false);
+
+  useEffect(() => {
+    const nav = navigator as Navigator & { standalone?: boolean };
+    const installed = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
+    if (installed) return;
+    const onPrompt = (event: Event) => {
+      event.preventDefault();
+      setPrompt(event as InstallPrompt);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    const apple = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    setIos(apple);
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+
+  if (prompt) {
+    return (
+      <button
+        type="button"
+        className="mt-6 inline-flex min-h-11 items-center rounded-full border border-cream/30 px-4 text-sm text-cream"
+        onClick={() => {
+          void prompt.prompt();
+          setPrompt(null);
+        }}
+      >
+        Læg pubben på hjemmeskærmen
+      </button>
+    );
+  }
+  if (!ios) return null;
+  return (
+    <p className="mt-6 max-w-xs text-sm leading-6 text-cream/75">
+      Læg pubben på hjemmeskærmen: tryk Del, og vælg Føj til hjemmeskærm.
+    </p>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { site } = usePub();
   const logo = site.logoImage || "/media/logo.png";
@@ -130,6 +175,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <SocialLinks site={site} tone="dark" />
             </div>
             <p className="mt-6">CVR 33340826</p>
+            <InstallApp />
           </div>
         </div>
       </footer>
